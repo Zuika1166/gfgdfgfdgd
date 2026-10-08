@@ -12,10 +12,10 @@ const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const css = fs.readFileSync(path.join(root,'experience.css'),'utf8');
 const studio = fs.readFileSync(path.join(root,'studio.css'),'utf8');
 
-function mount(){
+function mount(previousStorage=null){
   const timers=[],frames=[],app={innerHTML:''};
   const toast={append(){}};
-  let persisted=null;
+  let persisted=previousStorage;
   const location={hash:'#/'};
   const window={matchMedia(){return {matches:true}},addEventListener(){},scrollTo(){}};
   const document={
@@ -45,7 +45,7 @@ function mount(){
     const pending=timers.splice(0);
     for(const task of pending){if(task.ms>=300)task.fn();}
   };
-  return {api:window.__probe,app,location,settle,frames};
+  return {api:window.__probe,app,location,settle,frames,storage:()=>persisted};
 }
 
 test('entrypoint loads both style layers and application script',()=>{
@@ -207,4 +207,18 @@ test('voluntary virtual daily limit prevents further spending',()=>{
  assert.equal(api.spend(80),true);
  assert.equal(api.spend(30),false);
  assert.equal(api.state.balance,before-80);
+});
+
+
+test('case pending transaction survives reload and awards exactly once',()=>{
+ const first=mount();
+ first.api.openCase('eco');
+ const winner=first.api.ui.caseRoll.reward;
+ assert.ok(first.api.state.pendingCase&&winner.uuid);
+ const recovered=mount(first.storage());
+ assert.equal(recovered.api.state.pendingCase,null);
+ assert.equal(recovered.api.state.inventory.length,1);
+ assert.equal(recovered.api.state.inventory[0].uuid,winner.uuid);
+ const recoveredAgain=mount(recovered.storage());
+ assert.equal(recoveredAgain.api.state.inventory.length,1);
 });
