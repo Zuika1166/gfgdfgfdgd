@@ -150,6 +150,7 @@ test('case rarity weights sum to 100% and the corresponding catalogue exposes od
  assert.ok(Math.max(...odds)>Math.min(...odds));
  location.hash='#/cases/eco';api.render();
  assert.match(app.innerHTML,/Шанс \d+\.\d+%/);
+ api.openCase('eco');
  assert.match(app.innerHTML,/Пропустить анимацию/);
 });
 test('favorite cases and query/filter controls are working client-side',()=>{
