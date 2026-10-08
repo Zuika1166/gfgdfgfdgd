@@ -235,3 +235,17 @@ test('interrupted virtual game stake is refunded on reload',()=>{
  assert.equal(second.api.state.balance,original);
  assert.ok(second.api.state.history.some(x=>x.title.includes('Возврат прерванной')));
 });
+
+
+test('all public demo routes and all case and game pages render without a thrown exception',()=>{
+ const {api,location,app}=mount();
+ const fixed=['/','/arena','/cases','/bonuses','/fair','/payment','/inventory','/profile','/privacy','/responsible','/history','/leaderboard'];
+ const cases=['neon','eco','sakura','mirage','chicken','boss','storm','inferno','galaxy','glitch','gold','knife'].map(x=>'/cases/'+x);
+ const games=api.games.map(x=>'/games/'+x.id);
+ for(const route of [...fixed,...cases,...games]){
+   location.hash='#'+route;
+   api.render();
+   assert.match(app.innerHTML,/<main\b/,route);
+   assert.doesNotMatch(app.innerHTML,/Раздел не найден/,route);
+ }
+});
