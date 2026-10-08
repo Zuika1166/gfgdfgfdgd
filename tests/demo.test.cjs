@@ -10,6 +10,7 @@ const root = path.join(__dirname,'..');
 const source = fs.readFileSync(path.join(root,'app.js'),'utf8');
 const html = fs.readFileSync(path.join(root,'index.html'),'utf8');
 const css = fs.readFileSync(path.join(root,'experience.css'),'utf8');
+const studio = fs.readFileSync(path.join(root,'studio.css'),'utf8');
 
 function mount(){
   const timers=[],frames=[],app={innerHTML:''};
@@ -25,7 +26,7 @@ function mount(){
   const probe={};
   const suffix="if(!location.hash)location.hash='#/';render();\n})();";
   assert.ok(source.includes(suffix),'test harness insertion point');
-  const script=source.replace(suffix,"if(!location.hash)location.hash='#/';render();\nwindow.__probe={state,ui,render,openCase,playGame,startCrash,cashCrash,startMines,clickMine,cashMines,startChicken,gameStage,lootForCase,wheelFactors,cutWire};\n})();");
+  const script=source.replace(suffix,"if(!location.hash)location.hash='#/';render();\nwindow.__probe={state,ui,render,openCase,playGame,startCrash,cashCrash,startMines,clickMine,cashMines,startChicken,gameStage,lootForCase,wheelFactors,cutWire,caseChances,pickWeightedIndex,selectedUpgrade,upgradeChance,runUpgrade,upgradePage,runFairSimulation,spend,caseCatalogue,arena,games,finishCase};\n})();");
   const sandbox={
     window,document,location,localStorage:{
       getItem(){return persisted},
@@ -50,6 +51,9 @@ function mount(){
 test('entrypoint loads both style layers and application script',()=>{
  assert.match(html,/styles\.css/);
  assert.match(html,/experience\.css/);
+ assert.match(html,/studio\.css/);
+ assert.match(studio,/\.launch-hero/);
+ assert.match(studio,/\.upgrade-workshop/);
  assert.match(html,/app\.js/);
  assert.match(css,/prefers-reduced-motion/);
  assert.match(css,/\.case-reel-viewport/);
@@ -124,4 +128,82 @@ test('every animated stage has expected semantic structural element',()=>{
  };
  for(const [id,expected] of Object.entries(expectations))
   assert.ok(api.gameStage(id).includes(expected),id+' stage missing '+expected);
+});
+
+
+test('NOVADROP uses honest routes, new brand and ten fully declared modes',()=>{
+ const {api,app,location}=mount();
+ assert.match(app.innerHTML,/NOVADROP/);
+ assert.match(app.innerHTML,/SEASON ZERO/);
+ assert.doesNotMatch(app.innerHTML,/онлайн\*/);
+ assert.equal(api.games.length,10);
+ location.hash='#/arena';api.render();
+ assert.match(app.innerHTML,/Upgrade Lab/);
+ assert.match(app.innerHTML,/Игровая арена/);
+});
+test('case rarity weights sum to 100% and the corresponding catalogue exposes odds',()=>{
+ const {api,location,app}=mount();
+ const items=api.lootForCase({id:'eco',price:49,name:'Эко раунд'});
+ const odds=api.caseChances(items);
+ assert.equal(items.length,30);
+ assert.ok(Math.abs(odds.reduce((a,b)=>a+b,0)-100)<1e-8);
+ assert.ok(Math.max(...odds)>Math.min(...odds));
+ location.hash='#/cases/eco';api.render();
+ assert.match(app.innerHTML,/Шанс \d+\.\d+%/);
+ assert.match(app.innerHTML,/Пропустить анимацию/);
+});
+test('favorite cases and query/filter controls are working client-side',()=>{
+ const {api,location}=mount();
+ location.hash='#/cases';
+ assert.match(api.caseCatalogue(),/case-search/);
+ api.state.favorites.push('eco');
+ api.ui.favoritesOnly=true;
+ const doc=api.caseCatalogue();
+ assert.match(doc,/Эко раунд/);
+ assert.doesNotMatch(doc,/Knife Party/);
+ api.ui.favoritesOnly=false;
+ api.ui.caseQuery='sakura';
+ assert.match(api.caseCatalogue(),/Sakura/);
+ assert.doesNotMatch(api.caseCatalogue(),/Knife Party/);
+});
+test('skipping a case animation awards a single prize and timer cannot duplicate it',()=>{
+ const {api,settle}=mount();
+ api.openCase('eco');
+ assert.equal(api.ui.caseRoll.reward.asset.length>0,true);
+ api.finishCase();
+ assert.equal(api.state.inventory.length,1);
+ settle();
+ assert.equal(api.state.inventory.length,1);
+ assert.equal(api.ui.busy,false);
+});
+test('Upgrade Lab selects and settles an inventory transformation',()=>{
+ const {api,settle,location,app}=mount();
+ api.openCase('eco');settle();
+ assert.equal(api.state.inventory.length,1);
+ const options=api.selectedUpgrade();
+ assert.ok(options.item&&options.target);
+ assert.ok(api.upgradeChance(options.item,options.target)>=1);
+ location.hash='#/games/upgrade';api.render();
+ assert.match(app.innerHTML,/ВЕРОЯТНОСТЬ/);
+ api.runUpgrade();
+ assert.equal(api.ui.busy,true);
+ assert.ok(api.ui.upgradeRoll);
+ settle();
+ assert.equal(api.ui.busy,false);
+ assert.ok(api.ui.modal&&api.ui.modal.type==='upgrade');
+ assert.ok(api.state.inventory.length===0||api.state.inventory.length===1);
+});
+test('transparent fairness simulation counts 10000 outcomes',()=>{
+ const {api}=mount();
+ api.runFairSimulation();
+ assert.equal(api.ui.fairSim.total,10000);
+ assert.equal(api.ui.fairSim.common+api.ui.fairSim.rare+api.ui.fairSim.legendary,10000);
+});
+test('voluntary virtual daily limit prevents further spending',()=>{
+ const {api}=mount();
+ api.state.dailyLimit=100;
+ const before=api.state.balance;
+ assert.equal(api.spend(80),true);
+ assert.equal(api.spend(30),false);
+ assert.equal(api.state.balance,before-80);
 });
