@@ -1,0 +1,19 @@
+{
+  "name": "NOVADROP — CS2 Playground Demo",
+  "short_name": "NOVADROP",
+  "description": "Демонстрационная CS2-арена с виртуальными кейсами и игровыми механиками.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090f1b",
+  "theme_color": "#090f1b",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ]
+}
