@@ -374,3 +374,32 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
  .upgrade-section-top>strong{display:block;margin-top:5px}
 }
 @media(prefers-reduced-motion:reduce){.upgrade-wheel.is-spinning,.upgrade-wheel.is-spinning .upgrade-inner,.upgrade-hero-icon{animation:none!important}}
+
+
+/* Transparent demo / fairness dashboard / legal page */
+.fair-breakdown{margin:23px 0;display:flex;flex-direction:column;gap:19px}
+.fair-category{display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center;font-size:12px;color:#b8c7d3}
+.fair-category strong{color:#ecf8ee;font-size:14px;font-variant-numeric:tabular-nums}
+.fair-bar{grid-column:1/-1;height:8px;border-radius:99px;overflow:hidden;background:#30485e}
+.fair-bar i{display:block;height:100%;background:linear-gradient(90deg,#80dac8,#d2ff83);border-radius:99px}
+.fair-category:nth-child(2) .fair-bar i{background:linear-gradient(90deg,#8a91ff,#d5b1ff)}
+.fair-category:nth-child(3) .fair-bar i{background:linear-gradient(90deg,#cb6cc2,#ffa9dc)}
+.fair-results{margin-top:16px;border:1px solid #486c5b;border-radius:12px;padding:10px 17px;background:#112e31}
+.fair-results .metric-row{font-size:12px;flex-wrap:wrap}
+.fair-results .metric-row strong{color:#ceff91}
+.fair-results .metric-row small{font-size:9px;color:#8ca6b2}
+.limit-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:20px 0}
+.limit-options .choice{padding:11px 4px;min-width:0;white-space:nowrap;font-size:10px}
+.limit-options .choice.active{color:#1d382a!important;background:#bdf77c!important}
+.legal-sheet{max-width:1000px;margin:0 auto;padding:31px 38px}
+.legal-sheet h2{font-size:19px;letter-spacing:-.4px;margin:23px 0 11px}
+.legal-sheet h2:first-child{margin-top:0}
+.legal-sheet p{color:#b0c2cf;font-size:13px;line-height:1.85;margin:0 0 14px}
+.legal-sheet .btn{margin-top:16px}
+.game-stage~.demo-banner{background:#1c2e41;border-color:#536b7a}
+@media(max-width:520px){
+ .limit-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .legal-sheet{padding:22px}
+ .fair-results .metric-row{display:block}
+ .fair-results .metric-row strong{display:block;margin-top:4px}
+}
