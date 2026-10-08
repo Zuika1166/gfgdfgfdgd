@@ -45,7 +45,22 @@ const itemNames=[
  {name:"Karambit | Doppler",asset:"507-415",min:1400,klass:"legendary",rarity:"Нож",emoji:"🗡️"},
  {name:"Butterfly Knife | Fade",asset:"515-38",min:1750,klass:"legendary",rarity:"Нож",emoji:"🗡️"},
  {name:"Sport Gloves | Vice",asset:"5030-10048",min:2100,klass:"legendary",rarity:"Перчатки",emoji:"🧤"},
- {name:"AWP | Dragon Lore",asset:"9-344",min:3500,klass:"legendary",rarity:"Тайное",emoji:"🎯"}
+ {name:"AWP | Dragon Lore",asset:"9-344",min:3500,klass:"legendary",rarity:"Тайное",emoji:"🎯"},
+ {name:"AK-47 | Fire Serpent",asset:"7-180",min:950,klass:"legendary",rarity:"Тайное",emoji:"🎯"},
+ {name:"M4A4 | Desolate Space",asset:"16-588",min:210,klass:"rare",rarity:"Засекреченное",emoji:"🔫"},
+ {name:"M4A1-S | Hot Rod",asset:"60-445",min:430,klass:"legendary",rarity:"Тайное",emoji:"🔫"},
+ {name:"AWP | Wildfire",asset:"9-917",min:285,klass:"rare",rarity:"Тайное",emoji:"🎯"},
+ {name:"M4A4 | Asiimov",asset:"16-255",min:180,klass:"rare",rarity:"Тайное",emoji:"🔫"},
+ {name:"USP-S | Neo-Noir",asset:"61-653",min:185,klass:"rare",rarity:"Засекреченное",emoji:"🔫"},
+ {name:"Desert Eagle | Code Red",asset:"1-711",min:205,klass:"rare",rarity:"Тайное",emoji:"🦅"},
+ {name:"AK-47 | Bloodsport",asset:"7-639",min:380,klass:"legendary",rarity:"Тайное",emoji:"🎯"},
+ {name:"AWP | Hyper Beast",asset:"9-475",min:260,klass:"rare",rarity:"Засекреченное",emoji:"🎯"},
+ {name:"M4A1-S | Hyper Beast",asset:"60-430",min:165,klass:"rare",rarity:"Засекреченное",emoji:"🔫"},
+ {name:"Karambit | Fade",asset:"507-38",min:1780,klass:"legendary",rarity:"Нож",emoji:"🗡️"},
+ {name:"AWP | Containment Breach",asset:"9-887",min:355,klass:"legendary",rarity:"Тайное",emoji:"🎯"},
+ {name:"AK-47 | Asiimov",asset:"7-801",min:190,klass:"rare",rarity:"Тайное",emoji:"🎯"},
+ {name:"USP-S | Orion",asset:"61-313",min:250,klass:"rare",rarity:"Засекреченное",emoji:"🔫"},
+ {name:"M4A4 | Temukau",asset:"16-1228",min:245,klass:"rare",rarity:"Засекреченное",emoji:"🔫"}
 ];
 function skinVisual(item,className=''){
  const id=/^\d+-\d+$/.test(String(item?.asset||''))?item.asset:'';
@@ -87,7 +102,7 @@ function gameArt(id){let art='';
 function brand(){return `<a class="logo" href="#/" aria-label="Главная CSFAIL DEMO"><span class="logo-mark">✦</span><b>CS</b><i>FAIL</i><em>DEMO</em></a>`;}
 function navLink(p,symbol,name){return `<a class="nav-link ${currentPath()===p?'active':''}" href="#${p}" data-navigate="1"><span class="nav-icon">${symbol}</span>${name}</a>`;}
 function header(){return `<header class="site-header"><div class="container header-row">${brand()}<nav class="nav ${ui.menu?'open':''}" id="menu">${navLink('/','⌂','Главная')}${navLink('/cases','▣','Кейсы')}${navLink('/bonuses','✦','Бонусы')}${navLink('/leaderboard','🏆','Топ')}${navLink('/fair','✓','Честная игра')}${navLink('/history','◷','История')}</nav><div class="header-actions"><div class="balance"><small>Демо-баланс</small><strong>${fmt(state.balance)}</strong></div><button class="btn btn-primary" data-action="payment">＋ Пополнить</button><button class="icon-btn profile-btn" title="Профиль" data-action="profile">👤</button><button class="icon-btn hamburger" aria-label="Меню" aria-expanded="${ui.menu}" data-action="menu">☰</button></div></div></header>`;}
-function ticker(){const set=[...itemNames.slice(0,11),...itemNames.slice(0,11)];return '<div class="ticker-wrap"><div class="ticker"><span class="ticker-label"><span class="live-dot"></span> LIVE DROPS · DEMO</span>'+set.map((it,i)=>'<div class="ticker-item '+it.klass+'">'+skinVisual(it,'ticker-skin')+'<div><strong>'+esc(it.name)+'</strong><small>виртуальный дроп #'+(i%11+1)+'</small></div><em>'+fmt(it.min*4)+'</em></div>').join('')+'</div></div>';}
+function ticker(){const sample=itemNames.filter((_,i)=>i%2===0).slice(0,15);const set=[...sample,...sample];return '<div class="ticker-wrap"><div class="ticker"><span class="ticker-label"><span class="live-dot"></span> LIVE DROPS · DEMO</span>'+set.map((it,i)=>'<div class="ticker-item '+it.klass+'">'+skinVisual(it,'ticker-skin')+'<div><strong>'+esc(it.name)+'</strong><small>виртуальный дроп #'+(i%sample.length+1)+'</small></div><em>'+fmt(it.min*4)+'</em></div>').join('')+'</div></div>';}
 function footer(){return `<footer class="site-footer"><div class="container"><div class="footer-grid"><div>${brand()}<p>Демонстрационный проект по мотивам интерфейсов CS2. Виртуальные кредиты и предметы не имеют денежной стоимости, не выводятся и не обмениваются на игровые скины.</p></div><div class="footer-links"><strong>Навигация</strong><a href="#/">Главная</a><a href="#/cases">Каталог кейсов</a><a href="#/bonuses">Бонусы</a><a href="#/leaderboard">Рейтинг игроков</a></div><div class="footer-links"><strong>Информация</strong><a href="#/fair">Демо и ограничения</a><a href="#/inventory">Мой инвентарь</a><a href="#/history">История действий</a><a href="#/payment">Виртуальное пополнение</a></div></div><div class="foot-bottom"><span>© ${new Date().getFullYear()} CSFAIL DEMO • Независимый концепт • Не связан с Valve, Steam или CSFAIL</span><span>18+ оригинальная тематика • Без реальных денег</span></div></div></footer>`;}
 function demoNote(){return `<div class="demo-banner">⚠️ Это независимый интерактивный <strong>демо-прототип</strong>: вместо реальных денег используются виртуальные кредиты. Steam, платежи, вывод скинов и сетевые игры не подключены.</div>`;}
 function sectionTitle(name,subtitle='',url='',link='Смотреть все →'){return `<div class="section-header"><div><h2>${name}</h2>${subtitle?`<div class="subheading">${subtitle}</div>`:''}</div>${url?`<a class="text-link" href="#${url}">${link}</a>`:''}</div>`;}
@@ -146,7 +161,7 @@ function openCase(id){
  if(ui.busy)return;
  const cs=c(id);if(!cs||!spend(cs.price))return;
  const items=lootForCase(cs);
- const v=Math.random(),ind=v<.44?rand(0,4):v<.81?rand(5,9):v<.967?rand(10,12):rand(13,14);
+ const weights=items.map(it=>it.klass==='common'?15:it.klass==='rare'?4.5:.65);let roll=Math.random()*weights.reduce((a,b)=>a+b,0),ind=0;for(;ind<items.length-1;ind++){roll-=weights[ind];if(roll<0)break;}
  const reward={...items[ind],uuid:Date.now().toString(36)+Math.random().toString(36).slice(2),caseName:cs.name};
  const winningIndex=49, duration=prefersReducedMotion()?350:5400;
  const reel=Array.from({length:58},()=>pick(items));reel[winningIndex]=reward;
