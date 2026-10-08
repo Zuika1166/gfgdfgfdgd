@@ -56,7 +56,7 @@ const today=()=>new Date().toLocaleDateString('sv-SE');
 const defaults={balance:2500,inventory:[],history:[],username:'Demo Player',loggedIn:false,dailyDate:'',promoUsed:false};
 let state;
 try {state={...defaults,...JSON.parse(localStorage.getItem(LS_KEY)||'{}')}; if(!Array.isArray(state.inventory))state.inventory=[];if(!Array.isArray(state.history))state.history=[];}catch(_){state={...defaults};}
-let ui={modal:null,filter:'all',activeBet:100,color:'red',method:'card',amount:500,menu:false,spinning:false,wheelAngle:0,crash:null,mines:null,chicken:null,lastGameResult:'',latestNumbers:[],busy:false,caseRoll:null,doubleReel:null,lastMine:-1,defuseResult:null};
+let ui={modal:null,filter:'all',activeBet:100,color:'red',method:'card',amount:500,menu:false,spinning:false,wheelAngle:0,crash:null,mines:null,chicken:null,lastGameResult:'',latestNumbers:[],busy:false,caseRoll:null,doubleReel:null,lastMine:-1,defuseResult:null,crashBurst:false};
 let crashTimer=null;
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(_){}}
 function rand(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
@@ -106,17 +106,16 @@ function fair(){return `${demoNote()}<div class="page-heading"><div><div class="
 function historyPage(){return `${demoNote()}<div class="page-heading"><div><div class="eyebrow">СТАТИСТИКА</div><h1>История действий</h1></div><span class="tag">${state.history.length} записей</span></div><div class="panel">${state.history.length?state.history.map(it=>`<div class="history-row"><div><strong>${esc(it.title)}</strong><br><span>${new Date(it.date).toLocaleString('ru-RU')}</span></div><strong class="${it.value>0?'win':it.value<0?'lose':''}">${it.value>0?'+':''}${fmt(it.value)}</strong></div>`).join(''):`<div class="empty"><div class="empty-icon">🕘</div><strong>Пока ничего не произошло</strong><p>Открой кейс или запусти демонстрационную игру.</p><a href="#/cases" class="btn btn-primary">Начать</a></div>`}</div>`;}
 function leaderboard(){const people=[['🏆','HyperNova','127 800 ₽'],['⚡','VoltPlayer','98 400 ₽'],['👑','SkyWalker','77 900 ₽'],['🎯','FastClick','68 700 ₽'],['💎','BlueDiamond','64 500 ₽'],['🛡️','Shield99','51 200 ₽'],['🔥','HotCase','37 600 ₽'],['🎮','DemoRunner','26 300 ₽']];return `${demoNote()}<div class="page-heading"><div><div class="eyebrow">ТАБЛИЦА ЛИДЕРОВ</div><h1>Топ игроков</h1><div class="page-sub">Вымышленные профили и значения для макета.</div></div></div><div class="panel"><table class="leader-table"><thead><tr><th>Место</th><th>Игрок</th><th>Демо-результат</th></tr></thead><tbody>${people.map(([em,n,v],i)=>`<tr><td>#${i+1}</td><td><span class="avatar">${em}</span><strong>${n}</strong></td><td>${v}</td></tr>`).join('')}</tbody></table></div>`;}
 function betMarkup(){return `<label class="label" for="game-bet">Размер ставки (виртуальные кредиты)</label><input class="field" id="game-bet" inputmode="numeric" type="number" min="10" max="100000" step="10" value="${ui.activeBet}"/><div class="choice-row">${[50,100,250,500].map(n=>`<button type="button" data-bet="${n}" class="choice ${ui.activeBet===n?'active':''}">${fmt(n)}</button>`).join('')}</div>`;}
+function wheelFactors(id){return id==='crazy'?[0,1.2,2,5,0,10,2,3,0,7,1.5,3]:[0,1,2,0,3,1.5,0,4,1.2,2,0,3];}
+function rouletteSequence(){return ['red','black','red','black','red','black','green','black','red','black','red','black','red','black'];}
 function gameStage(id){
- if(id==='crash')return `<div class="game-stage"><span class="stage-label">DEMO CRASH / ${ui.crash?.active?'идёт раунд':'ожидание'}</span><div class="crash-line" id="crash-line"></div><div class="stage-center"><div class="factor" id="crash-factor">${ui.crash?.active?ui.crash.factor.toFixed(2):'1.00'}×</div><div class="stage-sub" id="crash-status">${ui.crash?.active?'Множитель растёт…':'Начни раунд и забери виртуальный выигрыш до сброса.'}</div></div></div>`;
- if(id==='mines'){
- const m=ui.mines;
- return `<div class="game-stage"><span class="stage-label">МИНЫ / ${m&&!m.ended?'раунд активен':'ожидание'}</span><div class="mines-grid">${Array.from({length:25},(_,i)=>{const safe=m?.opened.has(i),bomb=m?.mines.has(i)&&m.ended;return `<button aria-label="Клетка ${i+1}" data-mine="${i}" class="mine-tile ${safe?'revealed':''} ${bomb?'exploded':''}" ${!m||m.ended||safe?'disabled':''}>${safe?'💎':bomb?'💣':'✦'}</button>`}).join('')}</div></div><div class="metric-row"><span>Открыто клеток</span><strong>${m?.opened.size||0}/22</strong></div><div class="metric-row"><span>Текущий множитель</span><strong>${mineMultiplier(m).toFixed(2)}×</strong></div>`;
- }
- if(id==='wheel'||id==='crazy')return `<div class="game-stage"><span class="stage-label">${id==='wheel'?'WHEEL':'CRAZY WHEEL'}</span><div class="wheel-arrow"></div><div class="wheel-circle" id="main-wheel" style="transform:rotate(${ui.wheelAngle}deg)"></div></div>`;
- if(id==='double')return `<div class="game-stage"><span class="stage-label">DOUBLE / рулетка</span><div class="roulette-line">${['red','black','red','black','green','black','red','black','red'].map((s,i)=>`<div class="roulette-cell ${s} ${i===4?'selected':''}">${s==='green'?'0':i+1}</div>`).join('')}</div></div><div class="section-header" style="margin:15px 0 9px"><h2 style="font-size:13px">Выбери цвет</h2></div><div class="color-choices">${[['red','Красный ×2'],['black','Чёрный ×2'],['green','Зелёный ×14']].map(([col,name])=>`<button data-color="${col}" class="btn ${col} ${ui.color===col?'active':''}">${name}</button>`).join('')}</div>`;
- if(id==='defuse')return `<div class="game-stage"><span class="stage-label">DEFUSE / выбери один провод</span><div class="wire-row">${['#ed677e','#6faaff','#72cfa7','#e6c073','#b981ee'].map((col,i)=>`<button class="wire" data-wire="${i}" ${!ui.defuseActive?'disabled':''}><span style="background:${col}"></span></button>`).join('')}</div></div>`;
- if(id==='chicken')return `<div class="game-stage"><span class="stage-label">CHICKEN ROAD / ${ui.chicken&&!ui.chicken.ended?'идёт раунд':'ожидание'}</span><div style="width:100%"><div class="chicken-track">${Array.from({length:6},(_,i)=>`<div class="track-step ${ui.chicken&&i<ui.chicken.step?'done':''} ${ui.chicken&&i===ui.chicken.step&&!ui.chicken.ended?'active':''}">${ui.chicken&&i<ui.chicken.step?'✅':i===0?'🐔':'🚦'}</div>`).join('')}</div><div class="stage-sub" style="text-align:center">${ui.chicken?'Пройдено: '+ui.chicken.step+' шагов':'Пройди максимум 6 этапов, но можно остановиться раньше'}</div></div></div>`;
- return `<div class="game-stage"><span class="stage-label">${id.toUpperCase()} / виртуальный матч</span><div class="stage-center"><div style="font-size:83px">${ico[id]}</div><div class="factor" style="font-size:30px">${id==='jackpot'?'Общий банк':'Битва 1 × 1'}</div><div class="stage-sub">${id==='jackpot'?'Виртуальное соревнование с ботами':'Твой персонаж против случайного демо-соперника'}</div></div></div>`;
+ if(id==='crash')return '<div class="game-stage crash-stage '+(ui.crashBurst?'crash-exploded':'')+'"><div class="stage-label"><span class="live-dot"></span> CRASH / '+(ui.crash?.active?'В ПОЛЁТЕ':'ОЖИДАНИЕ')+'</div><canvas id="crash-canvas" width="860" height="410" aria-label="График растущего множителя"></canvas><div class="crash-overlay"><div class="crash-factor" id="crash-factor">'+(ui.crash?.active?ui.crash.factor.toFixed(2):'1.00')+'×</div><div class="crash-caption" id="crash-status">'+(ui.crash?.active?'Успей забрать награду до обвала':'Множитель начнёт расти после запуска')+'</div></div><div class="crash-horizon"><span>1.00×</span><span>2.00×</span><span>5.00×</span><span>10.00×</span></div><div class="crash-blast">✹<small>CRASHED</small></div></div>';
+ if(id==='mines'){const m=ui.mines;return '<div class="game-stage mine-stage"><span class="stage-label">MINES / '+(m&&!m.ended?'РАУНД АКТИВЕН':'ОЖИДАНИЕ')+'</span><div class="mines-grid">'+Array.from({length:25},(_,i)=>{const safe=m?.opened.has(i),bomb=m?.mines.has(i)&&m.ended;return '<button aria-label="Клетка '+(i+1)+'" data-mine="'+i+'" class="mine-tile '+(safe?'revealed':'')+' '+(bomb?'exploded':'')+' '+(ui.lastMine===i?'mine-flip':'')+'" '+(!m||m.ended||safe?'disabled':'')+'><span class="mine-face">'+(safe?'💎':bomb?'💣':'✦')+'</span></button>'}).join('')+'</div><div class="mines-footnote">✦ Найди кристаллы · избегай мин</div></div><div class="metric-row"><span>Открыто клеток</span><strong>'+(m?.opened.size||0)+'/22</strong></div><div class="metric-row"><span>Текущий множитель</span><strong>'+mineMultiplier(m).toFixed(2)+'×</strong></div>';}
+ if(id==='wheel'||id==='crazy'){const sectors=wheelFactors(id);return '<div class="game-stage spinner-stage '+id+'"><span class="stage-label"><span class="live-dot"></span> '+(id==='wheel'?'WHEEL':'CRAZY WHEEL')+' / DEMO</span><div class="wheel-assembly"><div class="wheel-arrow"></div><div class="wheel-rotator" id="main-wheel" style="transform:rotate('+ui.wheelAngle+'deg)">'+sectors.map((num,i)=>'<span class="wheel-sector-label" style="--sector:'+i+'">'+(num?num+'×':'0')+'</span>').join('')+'</div><div class="wheel-hub"><span>✦</span><small>SPIN</small></div></div><div class="spinner-note">Прокрути колесо — результат совпадёт с сектором под стрелкой</div></div>';}
+ if(id==='double'){const seq=ui.doubleReel?.seq||Array.from({length:14},(_,i)=>rouletteSequence()[i]);return '<div class="game-stage double-stage"><span class="stage-label"><span class="live-dot"></span> DOUBLE / ЦВЕТОВАЯ РУЛЕТКА</span><div class="roulette-viewport"><div class="roulette-marker"></div><div class="roulette-track" id="double-track">'+seq.map((color,i)=>'<div class="roulette-cell '+color+'"><span>'+(color==='green'?'★':(i%14+1))+'</span></div>').join('')+'</div></div><div class="double-explainer">Красный ×2 · Чёрный ×2 · Зелёный ×14</div></div><div class="section-header" style="margin:15px 0 9px"><h2 style="font-size:13px">Выбери цвет</h2></div><div class="color-choices">'+[['red','Красный ×2'],['black','Чёрный ×2'],['green','Зелёный ×14']].map(([col,name])=>'<button data-color="'+col+'" class="btn '+col+' '+(ui.color===col?'active':'')+'" '+(ui.busy?'disabled':'')+'>'+name+'</button>').join('')+'</div>';}
+ if(id==='defuse')return '<div class="game-stage defuse-stage '+(ui.defuseResult?.passed?'defuse-success':ui.defuseResult?'defuse-failed':'')+'"><span class="stage-label">DEFUSE / ВЫБЕРИ ОДИН ПРОВОД</span><div class="bomb-panel"><div class="bomb-display">'+(ui.defuseResult?(ui.defuseResult.passed?'SAFE':'ERROR'):'00:45')+'</div><span class="bomb-screw first"></span><span class="bomb-screw second"></span><div class="wire-row">'+['#ff5a73','#57baff','#55ebbd','#f4ca5e','#ae83ff'].map((col,i)=>'<button class="wire '+(ui.defuseResult?.wire===i?(ui.defuseResult.passed?'cut':'boom'):'')+'" data-wire="'+i+'" '+(!ui.defuseActive?'disabled':'')+' title="Провод '+(i+1)+'"><span style="background:'+col+'"></span></button>').join('')+'</div></div><span class="defuse-help">'+(ui.defuseActive?'Провода активны — выбери один':'Запусти раунд, чтобы активировать провода')+'</span></div>';
+ if(id==='chicken')return '<div class="game-stage chicken-stage"><span class="stage-label">CHICKEN ROAD / '+(ui.chicken&&!ui.chicken.ended?'В ПУТИ':'ОЖИДАНИЕ')+'</span><div class="chicken-highway"><div class="road-stripe"></div><div class="chicken-track">'+Array.from({length:6},(_,i)=>'<div class="track-step '+(ui.chicken&&i<ui.chicken.step?'done':'')+' '+(ui.chicken&&i===ui.chicken.step&&!ui.chicken.ended?'active':'')+'">'+(ui.chicken&&i<ui.chicken.step?'✓':ui.chicken&&i===ui.chicken.step&&!ui.chicken.ended?'🐔':i===0?'🐔':'⚑')+'<small>×'+(1+i*.38+i*i*.09).toFixed(2)+'</small></div>').join('')+'</div></div><div class="stage-sub" style="text-align:center">'+(ui.chicken?'Пройдено: '+ui.chicken.step+' шагов':'6 полос · забирай награду в любой момент')+'</div></div>';
+ return '<div class="game-stage battle-stage"><span class="stage-label"><span class="live-dot"></span> '+id.toUpperCase()+' / VIRTUAL MATCH</span><div class="battle-arena"><div class="fighter '+(ui.busy?'fighter-fight':'')+'"><span class="fighter-avatar">⚡</span><strong>YOU</strong><small>демо-игрок</small></div><div class="arena-center"><span>VS</span><small>'+(ui.busy?'РАУНД ИДЁТ':'НАЧНИ БИТВУ')+'</small></div><div class="fighter rival '+(ui.busy?'fighter-fight':'')+'"><span class="fighter-avatar">☄</span><strong>BOT</strong><small>виртуальный соперник</small></div></div></div>';
 }
 function mineMultiplier(m){if(!m)return 1;const n=m.opened.size;return 1+n*.26+n*n*.055;}
 function gamePage(id){const x=g(id);if(!x)return notFound();const locked=ui.busy||(ui.crash?.active&&id==='crash');const activeMines=ui.mines&&!ui.mines.ended;const activeChicken=ui.chicken&&!ui.chicken.ended;return `${demoNote()}<div class="page-heading"><div><div class="eyebrow"><a href="#/">← Все режимы</a></div><h1>${ico[id]} ${x.name}</h1><div class="page-sub">${x.description}</div></div><span class="tag ${x.kind==='PVP'?'yellow':'green'}">${x.kind} • DEMO</span></div><div class="layout-2"><div class="panel">${gameStage(id)}${ui.lastGameResult?`<div class="demo-banner" style="margin:14px 0 0">${esc(ui.lastGameResult)}</div>`:''}<div class="section-header"><div><h2 style="font-size:15px">Последние результаты</h2></div><span class="tag">Локальная история</span></div><div class="recent-pills">${ui.latestNumbers.length?ui.latestNumbers.map(a=>`<span class="${a.success?'win':'lose'}">${esc(a.text)}</span>`).join(''):'<span>Пока нет сыгранных раундов</span>'}</div></div><div class="panel panel-highlight"><h2>Настройки игры</h2><p>${x.description} Используется только демонстрационная валюта.</p>${betMarkup()}${id==='crash'?`<div class="stage-actions"><button class="btn btn-primary" data-action="start-crash" ${locked?'disabled':''}>${ui.crash?.active?'Идёт раунд':'▶ Начать раунд'}</button><button class="btn btn-green" data-action="cash-crash" ${!ui.crash?.active?'disabled':''}>Забрать ×<span id="crash-btn-factor">${ui.crash?.factor.toFixed(2)||'1.00'}</span></button></div>`:''}${id==='mines'?`<div class="stage-actions"><button class="btn btn-primary" data-action="start-mines" ${activeMines?'disabled':''}>▶ Новая игра</button><button class="btn btn-green" data-action="cash-mines" ${!activeMines?'disabled':''}>Забрать ${fmt(ui.mines?ui.mines.bet*mineMultiplier(ui.mines):0)}</button></div>`:''}${id==='chicken'?`<div class="stage-actions"><button class="btn btn-primary" data-action="start-chicken" ${activeChicken?'disabled':''}>▶ Новая игра</button><button class="btn btn-green" data-action="step-chicken" ${!activeChicken?'disabled':''}>Шаг вперёд →</button><button class="btn btn-soft" data-action="cash-chicken" ${!activeChicken||!ui.chicken?.step?'disabled':''}>Забрать</button></div>`:''}${['wheel','crazy','double','jackpot','battles','defuse'].includes(id)?`<button class="btn btn-primary wide" style="margin-top:12px" data-action="play-game" data-game-id="${id}" ${ui.busy?'disabled':''}>${ui.busy?'Раунд идёт…':id==='defuse'?'▶ Запустить игру':'▶ Играть'}</button>`:''}<div class="section-divider"></div><div class="metric-row"><span>Виртуальный баланс</span><strong>${fmt(state.balance)}</strong></div><div class="metric-row"><span>Механика</span><strong>Упрощённая демо</strong></div><p class="hint">Результаты моделируются на клиенте через Math.random; они не являются provably fair. Этот прототип не подходит для ставок на реальные деньги.</p><button class="btn btn-soft wide" data-action="payment">＋ Пополнить демо-баланс</button></div></div>`;}
@@ -133,21 +132,119 @@ function openModal(data){ui.modal=data;render();}
 function closeModal(){ui.modal=null;render();}
 function redeemPromo(code){const val=String(code||'').trim().toUpperCase();if(val!=='DEMO2026'){toast('Промокод не найден. Попробуйте DEMO2026.','error');return;}if(state.promoUsed){toast('Этот код уже использован.','error');return;}state.promoUsed=true;win(300);record('Промокод DEMO2026',300);ui.modal=null;render();toast('Промокод активирован: +300 ₽ демо!', 'success');}
 function daily(){if(state.dailyDate===today()){toast('Сегодня бонус уже получен.','error');return;}state.dailyDate=today();win(150);record('Ежедневный бонус',150);render();toast('Начислено 150 ₽ виртуального баланса!','success');}
-function openCase(id){if(ui.busy)return;const cs=c(id);if(!cs)return;if(!spend(cs.price))return;ui.busy=true;record(`Открытие кейса: ${cs.name}`,-cs.price);render();toast('Открываем кейс…');setTimeout(()=>{let v=Math.random();let ind=v<.5?rand(0,1):v<.86?rand(2,4):v<.975?5:rand(6,7);const it={...lootForCase(cs)[ind],uuid:Date.now().toString()+Math.random().toString(36).slice(2),caseName:cs.name};state.inventory.unshift(it);save();record('Награда из кейса: '+it.name,0);ui.busy=false;openModal({type:'drop',item:it});},1000);}
+function prefersReducedMotion(){return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;}
+function animateTrack(el,winningIndex,duration,offset=0){
+ if(!el||!el.firstElementChild)return;
+ const gap=parseFloat(getComputedStyle(el).gap)||0;
+ const stride=el.firstElementChild.getBoundingClientRect().width+gap;
+ const viewport=el.parentElement.getBoundingClientRect().width;
+ const target=Math.max(0,winningIndex*stride+stride/2-viewport/2+offset);
+ if(el.animate)el.animate([{transform:'translate3d(0,0,0)'},{transform:'translate3d('+(-target)+'px,0,0)'}],{duration,easing:'cubic-bezier(.10,.68,.11,1)',fill:'forwards'});
+ else el.style.transform='translate3d('+(-target)+'px,0,0)';
+}
+function openCase(id){
+ if(ui.busy)return;
+ const cs=c(id);if(!cs||!spend(cs.price))return;
+ const items=lootForCase(cs);
+ const v=Math.random(),ind=v<.44?rand(0,4):v<.81?rand(5,9):v<.967?rand(10,12):rand(13,14);
+ const reward={...items[ind],uuid:Date.now().toString(36)+Math.random().toString(36).slice(2),caseName:cs.name};
+ const winningIndex=49, duration=prefersReducedMotion()?350:5400;
+ const reel=Array.from({length:58},()=>pick(items));reel[winningIndex]=reward;
+ ui.caseRoll={id,reel,winningIndex};ui.busy=true;
+ record('Открытие кейса: '+cs.name,-cs.price);render();
+ requestAnimationFrame(()=>animateTrack(document.getElementById('case-reel-track'),winningIndex,duration));
+ toast('Рулетка запущена · '+cs.name);
+ setTimeout(()=>{
+   if(ui.caseRoll?.id!==id)return;
+   state.inventory.unshift(reward);save();record('Награда из кейса: '+reward.name,0);
+   ui.caseRoll=null;ui.busy=false;ui.modal={type:'drop',item:reward};render();
+   toast('Получен виртуальный скин: '+reward.name,'success');
+ },duration+150);
+}
 function addBalance(){const input=document.getElementById('amount');const sum=Math.round(Number(input?.value||ui.amount));if(!Number.isFinite(sum)||sum<10||sum>100000){toast('Укажите сумму от 10 до 100 000','error');return;}ui.amount=sum;win(sum);record('Виртуальное пополнение',sum);render();toast(`Зачислено ${fmt(sum)} демо-баланса!`,'success');}
 function getBet(){let v=Math.round(Number(document.getElementById('game-bet')?.value||ui.activeBet));if(v<10||v>100000||!Number.isFinite(v)){toast('Ставка от 10 до 100 000 виртуальных кредитов.','error');return null;}ui.activeBet=v;return v;}
 function setLast(text,success){ui.lastGameResult=text;ui.latestNumbers.unshift({text,success});ui.latestNumbers=ui.latestNumbers.slice(0,8);}
-function startCrash(){if(ui.crash?.active)return;const bet=getBet();if(bet===null||!spend(bet))return;record('Crash: демо-ставка',-bet);const crashAt=Math.max(1.06,Math.min(10,Math.exp(Math.random()*1.55)));ui.crash={active:true,bet,factor:1,crashAt};ui.lastGameResult='';render();crashTimer=setInterval(()=>{let cr=ui.crash;if(!cr||!cr.active){clearInterval(crashTimer);return;}cr.factor=+(cr.factor+.035+cr.factor*.012).toFixed(2);let el=document.getElementById('crash-factor');if(el)el.textContent=cr.factor.toFixed(2)+'×';let btn=document.getElementById('crash-btn-factor');if(btn)btn.textContent=cr.factor.toFixed(2);if(cr.factor>=cr.crashAt){clearInterval(crashTimer);cr.active=false;setLast(`Crash: ×${cr.factor.toFixed(2)} — взрыв`,false);record('Crash: проигрыш',0);ui.crash=null;render();toast('Краш! Раунд завершён.','error');}},150);}
-function cashCrash(){const cr=ui.crash;if(!cr?.active)return;clearInterval(crashTimer);cr.active=false;const gain=Math.floor(cr.bet*cr.factor);win(gain);record('Crash: выигрыш',gain);setLast(`Crash: забрано ×${cr.factor.toFixed(2)} (+${fmt(gain)})`,true);ui.crash=null;render();toast(`Вывод: +${fmt(gain)} виртуальных кредитов`,'success');}
+function drawCrash(factor){
+ const canvas=document.getElementById('crash-canvas');if(!canvas)return;
+ const ctx=canvas.getContext('2d');if(!ctx)return;
+ const w=canvas.width,h=canvas.height;ctx.clearRect(0,0,w,h);
+ const pad=34;
+ ctx.lineWidth=1;ctx.strokeStyle='rgba(140,168,230,.11)';
+ for(let i=0;i<12;i++){const x=pad+(w-2*pad)*i/11;ctx.beginPath();ctx.moveTo(x,18);ctx.lineTo(x,h-20);ctx.stroke();}
+ for(let i=0;i<6;i++){const y=25+(h-52)*i/5;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-pad,y);ctx.stroke();}
+ const progress=Math.min(.95,Math.log(Math.max(1,factor))/Math.log(12));
+ const xe=pad+(w-2*pad)*Math.max(.04,progress),ye=h-48-(h-115)*Math.pow(progress,.52);
+ ctx.beginPath();ctx.moveTo(pad,h-48);for(let t=.01;t<=progress;t+=.009){const x=pad+(w-2*pad)*t,y=h-48-(h-115)*Math.pow(t,.52);ctx.lineTo(x,y);}ctx.lineTo(xe,ye);
+ const area=ctx.createLinearGradient(0,ye,0,h);area.addColorStop(0,'rgba(79,229,196,.29)');area.addColorStop(1,'rgba(79,229,196,0)');ctx.lineTo(xe,h-48);ctx.closePath();ctx.fillStyle=area;ctx.fill();
+ ctx.beginPath();ctx.moveTo(pad,h-48);for(let t=.01;t<=progress;t+=.009){ctx.lineTo(pad+(w-2*pad)*t,h-48-(h-115)*Math.pow(t,.52));}ctx.lineTo(xe,ye);ctx.lineWidth=6;ctx.strokeStyle='rgba(60,241,201,.12)';ctx.shadowBlur=22;ctx.shadowColor='#44efd0';ctx.stroke();ctx.shadowBlur=0;ctx.lineWidth=3;ctx.strokeStyle='#5ef6cf';ctx.stroke();
+ ctx.beginPath();ctx.arc(xe,ye,7,0,2*Math.PI);ctx.fillStyle='#bcfff1';ctx.shadowColor='#5afade';ctx.shadowBlur=26;ctx.fill();ctx.shadowBlur=0;
+}
+function startCrash(){
+ if(ui.crash?.active||ui.busy)return;
+ const bet=getBet();if(bet===null||!spend(bet))return;
+ record('Crash: демо-ставка',-bet);
+ const crashAt=Math.max(1.07,Math.min(12,Math.exp(Math.random()*1.78)));
+ const cr={active:true,bet,factor:1,crashAt,start:performance.now(),raf:0};
+ ui.crash=cr;ui.crashBurst=false;ui.lastGameResult='';render();
+ const step=(now)=>{
+   if(ui.crash!==cr||!cr.active)return;
+   cr.factor=Math.max(1,Math.exp((now-cr.start)/1000*.23));
+   const value=document.getElementById('crash-factor');if(value)value.textContent=cr.factor.toFixed(2)+'×';
+   const btn=document.getElementById('crash-btn-factor');if(btn)btn.textContent=cr.factor.toFixed(2);
+   drawCrash(cr.factor);
+   if(cr.factor>=cr.crashAt){
+     cr.active=false;ui.crash=null;ui.crashBurst=true;
+     setLast('Crash: ×'+cr.factor.toFixed(2)+' — взрыв',false);record('Crash: проигрыш',0);render();
+     toast('CRASH! Множитель обвалился','error');
+     setTimeout(()=>{if(ui.crashBurst){ui.crashBurst=false;if(currentPath()==='/games/crash')render();}},1100);
+   }else cr.raf=requestAnimationFrame(step);
+ };
+ cr.raf=requestAnimationFrame(step);
+}
+function cashCrash(){
+ const cr=ui.crash;if(!cr?.active)return;
+ cr.active=false;cancelAnimationFrame(cr.raf);
+ const gain=Math.floor(cr.bet*cr.factor);win(gain);record('Crash: выигрыш',gain);
+ setLast('Crash: забрано ×'+cr.factor.toFixed(2)+' (+'+fmt(gain)+')',true);
+ ui.crash=null;ui.crashBurst=false;render();toast('Забрано +'+fmt(gain)+' виртуальных кредитов','success');
+}
 function startMines(){if(ui.mines&&!ui.mines.ended)return;const bet=getBet();if(bet===null||!spend(bet))return;const mines=new Set();while(mines.size<3)mines.add(rand(0,24));ui.mines={bet,mines,opened:new Set(),ended:false};ui.lastGameResult='';record('Mines: демо-ставка',-bet);render();}
 function clickMine(i){const m=ui.mines;if(!m||m.ended||m.opened.has(i))return;if(m.mines.has(i)){m.ended=true;setLast('Mines: минa — раунд проигран',false);record('Mines: проигрыш',0);render();toast('Ты попал на мину!', 'error');return;}m.opened.add(i);if(m.opened.size>=22){cashMines();return;}render();}
 function cashMines(){const m=ui.mines;if(!m||m.ended)return;m.ended=true;let gain=Math.floor(m.bet*mineMultiplier(m));win(gain);record('Mines: выигрыш',gain);setLast(`Mines: ${m.opened.size} клеток (+${fmt(gain)})`,true);render();toast(`Выигрыш +${fmt(gain)}`, 'success');}
 function startChicken(){if(ui.chicken&&!ui.chicken.ended)return;const bet=getBet();if(bet===null||!spend(bet))return;record('Chicken Road: демо-ставка',-bet);ui.chicken={bet,step:0,ended:false};ui.lastGameResult='';render();}
 function stepChicken(){const ch=ui.chicken;if(!ch||ch.ended)return;if(Math.random()<.22){ch.ended=true;setLast(`Chicken Road: ${ch.step} шагов — проигрыш`,false);record('Chicken Road: проигрыш',0);render();toast('Опасность на дороге!','error');return;}ch.step++;if(ch.step===6){cashChicken();return;}render();}
 function cashChicken(){const ch=ui.chicken;if(!ch||ch.ended||ch.step<1)return;ch.ended=true;const gain=Math.floor(ch.bet*(1+ch.step*.38+ch.step*ch.step*.09));win(gain);record('Chicken Road: выигрыш',gain);setLast(`Chicken Road: ${ch.step} шагов (+${fmt(gain)})`,true);render();toast(`Забрано +${fmt(gain)}`,'success');}
-function playGame(id){if(ui.busy)return;const bet=getBet();if(bet===null||!spend(bet))return;ui.busy=true;ui.lastGameResult='';record(g(id).name+': демо-ставка',-bet);render();if(id==='wheel'||id==='crazy'){ui.wheelAngle+=1080+rand(25,350);const wheel=document.getElementById('main-wheel');if(wheel){requestAnimationFrame(()=>wheel.style.transform=`rotate(${ui.wheelAngle}deg)`);}}
- if(id==='defuse'){ui.defuseActive=true;ui.defuseBet=bet;ui.busy=false;render();toast('Выбери один из 5 проводов.');return;}
- setTimeout(()=>{let gain=0;let text='';if(id==='double'){const outcomes=['red','red','red','red','red','red','black','black','black','black','black','black','black','green'];const result=pick(outcomes);gain=result===ui.color?bet*(result==='green'?14:2):0;text=`Double: ${result==='red'?'🔴 Красный':result==='black'?'⚫ Чёрный':'🟢 Зелёный'}`;}else if(id==='wheel'||id==='crazy'){const factor=pick(id==='wheel'?[0,.5,1,1.2,1.5,2,3,4]:[0,0,1,1.5,2,3,5,7,10]);gain=Math.floor(bet*factor);text=`${g(id).name}: ×${factor}`;}else if(id==='jackpot'){gain=Math.random()<.36?bet*2.6:0;text=g(id).name+': '+(gain?'Победа над ботами':'Победили боты');}else if(id==='battles'){gain=Math.random()<.46?bet*2:0;text='PVP Battle: '+(gain?'Твой герой победил':'Бот победил');}if(gain>0)win(gain);record(g(id).name+': '+(gain?'выигрыш':'проигрыш'),gain);setLast(`${text} — ${gain?'+'+fmt(gain):'без выигрыша'}`,gain>0);ui.busy=false;render();toast(gain?`Виртуальный выигрыш +${fmt(gain)}`:'Раунд завершён без выигрыша',gain?'success':'error');},1450);
+function playGame(id){
+ if(ui.busy||ui.crash?.active)return;
+ const bet=getBet();if(bet===null||!spend(bet))return;
+ const chosenColor=ui.color;
+ ui.busy=true;ui.lastGameResult='';record(g(id).name+': демо-ставка',-bet);
+ if(id==='defuse'){ui.defuseActive=true;ui.defuseBet=bet;ui.defuseResult=null;ui.busy=false;render();toast('Выбери один из пяти проводов');return;}
+ let factor=0,result='',selectedIndex=0,targetRotation=0,duration=prefersReducedMotion()?350:4400;
+ if(id==='wheel'||id==='crazy'){
+   const factors=wheelFactors(id);selectedIndex=rand(0,factors.length-1);factor=factors[selectedIndex];
+   const needed=((360-selectedIndex*360/factors.length-ui.wheelAngle%360)%360+360)%360;
+   targetRotation=ui.wheelAngle+360*6+needed;
+ }else if(id==='double'){
+   result=pick(rouletteSequence());
+   const seq=Array.from({length:60},()=>pick(rouletteSequence()));selectedIndex=51;seq[selectedIndex]=result;ui.doubleReel={seq,selectedIndex};
+ }
+ render();
+ if(id==='wheel'||id==='crazy'){
+   const disc=document.getElementById('main-wheel');
+   if(disc){if(disc.animate)disc.animate([{transform:'rotate('+ui.wheelAngle+'deg)'},{transform:'rotate('+targetRotation+'deg)'}],{duration,easing:'cubic-bezier(.12,.62,.08,1)',fill:'forwards'});else disc.style.transform='rotate('+targetRotation+'deg)';}
+   ui.wheelAngle=targetRotation;
+ }else if(id==='double')requestAnimationFrame(()=>animateTrack(document.getElementById('double-track'),selectedIndex,duration));
+ setTimeout(()=>{
+   let gain=0,text='';
+   if(id==='double'){gain=result===chosenColor?bet*(result==='green'?14:2):0;text='Double: '+({red:'Красный',black:'Чёрный',green:'Зелёный'}[result]);ui.doubleReel=null;}
+   else if(id==='wheel'||id==='crazy'){gain=Math.floor(bet*factor);text=g(id).name+': ×'+factor;}
+   else if(id==='jackpot'){gain=Math.random()<.36?Math.floor(bet*2.6):0;text='Jackpot: '+(gain?'победа над ботами':'победили боты');}
+   else if(id==='battles'){gain=Math.random()<.46?bet*2:0;text='PVP Battle: '+(gain?'твой персонаж победил':'бот победил');}
+   if(gain>0)win(gain);record(g(id).name+': '+(gain?'выигрыш':'проигрыш'),gain);
+   setLast(text+' — '+(gain?'+'+fmt(gain):'без выигрыша'),gain>0);
+   ui.busy=false;render();toast(gain?'Победа! +'+fmt(gain):'Раунд завершён',gain?'success':'error');
+ },['wheel','crazy','double'].includes(id)?duration+180:prefersReducedMotion()?450:2800);
 }
 function cutWire(i){if(!ui.defuseActive)return;const bet=ui.defuseBet;ui.defuseActive=false;const pass=rand(0,4)===i;const gain=pass?bet*4:0;if(gain)win(gain);record('Defuse: '+(pass?'выигрыш':'проигрыш'),gain);setLast(`Defuse: ${pass?'удачное обезвреживание! +'+fmt(gain):'бомба взорвалась'}`,pass);render();toast(pass?'Бомба обезврежена!':'Неверный провод!',pass?'success':'error');}
 function handleAction(action,el){
