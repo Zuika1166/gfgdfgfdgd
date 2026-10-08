@@ -222,3 +222,16 @@ test('case pending transaction survives reload and awards exactly once',()=>{
  const recoveredAgain=mount(recovered.storage());
  assert.equal(recoveredAgain.api.state.inventory.length,1);
 });
+
+
+test('interrupted virtual game stake is refunded on reload',()=>{
+ const first=mount();
+ const original=first.api.state.balance;
+ first.api.startMines();
+ assert.ok(first.api.state.pendingGame);
+ assert.equal(first.api.state.balance,original-100);
+ const second=mount(first.storage());
+ assert.equal(second.api.state.pendingGame,null);
+ assert.equal(second.api.state.balance,original);
+ assert.ok(second.api.state.history.some(x=>x.title.includes('Возврат прерванной')));
+});
