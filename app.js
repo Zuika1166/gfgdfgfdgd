@@ -208,14 +208,15 @@ function cashCrash(){
  setLast('Crash: забрано ×'+cr.factor.toFixed(2)+' (+'+fmt(gain)+')',true);
  ui.crash=null;ui.crashBurst=false;render();toast('Забрано +'+fmt(gain)+' виртуальных кредитов','success');
 }
-function startMines(){if(ui.mines&&!ui.mines.ended)return;const bet=getBet();if(bet===null||!spend(bet))return;const mines=new Set();while(mines.size<3)mines.add(rand(0,24));ui.mines={bet,mines,opened:new Set(),ended:false};ui.lastGameResult='';record('Mines: демо-ставка',-bet);render();}
-function clickMine(i){const m=ui.mines;if(!m||m.ended||m.opened.has(i))return;if(m.mines.has(i)){m.ended=true;setLast('Mines: минa — раунд проигран',false);record('Mines: проигрыш',0);render();toast('Ты попал на мину!', 'error');return;}m.opened.add(i);if(m.opened.size>=22){cashMines();return;}render();}
+function startMines(){if(ui.mines&&!ui.mines.ended)return;const bet=getBet();if(bet===null||!spend(bet))return;const mines=new Set();while(mines.size<3)mines.add(rand(0,24));ui.mines={bet,mines,opened:new Set(),ended:false};ui.lastMine=-1;ui.lastGameResult='';record('Mines: демо-ставка',-bet);render();}
+function clickMine(i){const m=ui.mines;if(!m||m.ended||m.opened.has(i)||i<0||i>24)return;ui.lastMine=i;if(m.mines.has(i)){m.ended=true;setLast('Mines: мина — раунд проигран',false);record('Mines: проигрыш',0);render();toast('Мина! Раунд завершён','error');return;}m.opened.add(i);if(m.opened.size>=22){cashMines();return;}render();}
 function cashMines(){const m=ui.mines;if(!m||m.ended)return;m.ended=true;let gain=Math.floor(m.bet*mineMultiplier(m));win(gain);record('Mines: выигрыш',gain);setLast(`Mines: ${m.opened.size} клеток (+${fmt(gain)})`,true);render();toast(`Выигрыш +${fmt(gain)}`, 'success');}
 function startChicken(){if(ui.chicken&&!ui.chicken.ended)return;const bet=getBet();if(bet===null||!spend(bet))return;record('Chicken Road: демо-ставка',-bet);ui.chicken={bet,step:0,ended:false};ui.lastGameResult='';render();}
 function stepChicken(){const ch=ui.chicken;if(!ch||ch.ended)return;if(Math.random()<.22){ch.ended=true;setLast(`Chicken Road: ${ch.step} шагов — проигрыш`,false);record('Chicken Road: проигрыш',0);render();toast('Опасность на дороге!','error');return;}ch.step++;if(ch.step===6){cashChicken();return;}render();}
 function cashChicken(){const ch=ui.chicken;if(!ch||ch.ended||ch.step<1)return;ch.ended=true;const gain=Math.floor(ch.bet*(1+ch.step*.38+ch.step*ch.step*.09));win(gain);record('Chicken Road: выигрыш',gain);setLast(`Chicken Road: ${ch.step} шагов (+${fmt(gain)})`,true);render();toast(`Забрано +${fmt(gain)}`,'success');}
 function playGame(id){
  if(ui.busy||ui.crash?.active)return;
+ if(id==='defuse'&&ui.defuseActive){toast('Сначала выбери активный провод','error');return;}
  const bet=getBet();if(bet===null||!spend(bet))return;
  const chosenColor=ui.color;
  ui.busy=true;ui.lastGameResult='';record(g(id).name+': демо-ставка',-bet);
@@ -246,7 +247,14 @@ function playGame(id){
    ui.busy=false;render();toast(gain?'Победа! +'+fmt(gain):'Раунд завершён',gain?'success':'error');
  },['wheel','crazy','double'].includes(id)?duration+180:prefersReducedMotion()?450:2800);
 }
-function cutWire(i){if(!ui.defuseActive)return;const bet=ui.defuseBet;ui.defuseActive=false;const pass=rand(0,4)===i;const gain=pass?bet*4:0;if(gain)win(gain);record('Defuse: '+(pass?'выигрыш':'проигрыш'),gain);setLast(`Defuse: ${pass?'удачное обезвреживание! +'+fmt(gain):'бомба взорвалась'}`,pass);render();toast(pass?'Бомба обезврежена!':'Неверный провод!',pass?'success':'error');}
+function cutWire(i){
+ if(!ui.defuseActive||i<0||i>4)return;
+ const bet=ui.defuseBet;ui.defuseActive=false;const pass=rand(0,4)===i;const gain=pass?bet*4:0;
+ ui.defuseResult={wire:i,passed:pass};if(gain)win(gain);
+ record('Defuse: '+(pass?'выигрыш':'проигрыш'),gain);
+ setLast('Defuse: '+(pass?'успешно обезврежено! +'+fmt(gain):'бомба взорвалась'),pass);
+ render();toast(pass?'Бомба обезврежена!':'Неверный провод!',pass?'success':'error');
+}
 function handleAction(action,el){
  if(action==='menu'){ui.menu=!ui.menu;render();}
  else if(action==='profile'){go('/profile');}
@@ -269,7 +277,7 @@ function handleAction(action,el){
  else if(action==='help'){openModal({type:'info',heading:'О демонстрационном проекте',text:'Это самостоятельный сайт-прототип без настоящих платежей, Steam-авторизации и игры на деньги. Его можно запускать локально и развивать дальше.'});}
  else if(action==='info-vip'){openModal({type:'info',heading:'VIP Club',text:'Карточка раздела VIP. Для production нужно разработать уровни, бонусы и серверную систему начисления.'});}
  else if(action==='reset'){openModal({type:'reset'});}
- else if(action==='reset-confirm'){state={...defaults,inventory:[],history:[]};ui={modal:null,filter:'all',activeBet:100,color:'red',method:'card',amount:500,menu:false,spinning:false,wheelAngle:0,crash:null,mines:null,chicken:null,lastGameResult:'',latestNumbers:[],busy:false};clearInterval(crashTimer);save();go('/');toast('Демо-прогресс сброшен.','success');}
+ else if(action==='reset-confirm'){state={...defaults,inventory:[],history:[]};if(ui.crash?.raf)cancelAnimationFrame(ui.crash.raf);ui={modal:null,filter:'all',activeBet:100,color:'red',method:'card',amount:500,menu:false,spinning:false,wheelAngle:0,crash:null,mines:null,chicken:null,lastGameResult:'',latestNumbers:[],busy:false,caseRoll:null,doubleReel:null,lastMine:-1,defuseResult:null,crashBurst:false};clearInterval(crashTimer);save();go('/');toast('Демо-прогресс сброшен.','success');}
 }
 document.addEventListener('click',e=>{
  const b=e.target.closest('[data-action]');if(b){e.preventDefault();handleAction(b.dataset.action,b);return;}
